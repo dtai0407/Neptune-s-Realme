@@ -1,0 +1,34 @@
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model GuildConfig {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  guildId         String    @unique
+  logChannelId    String?
+  modLogChannelId String?
+  autoRoleId      String?
+  antiInvite      Boolean   @default(true)
+  antiSpam        Boolean   @default(true)
+  maxMentions     Int       @default(5)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  warnings        Warning[]
+}
+
+model Warning {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  guildId     String
+  userId      String
+  moderatorId String
+  reason      String
+  createdAt   DateTime    @default(now())
+  guild       GuildConfig @relation(fields: [guildId], references: [guildId], onDelete: Cascade)
+
+  @@index([guildId, userId])
+}
