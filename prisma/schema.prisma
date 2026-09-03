@@ -21,6 +21,39 @@ model GuildConfig {
   warnings        Warning[]
 }
 
+model AutoResponder {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  guildId   String
+  trigger   String
+  response  String
+  matchMode String   @default("exact")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, trigger])
+  @@index([guildId])
+}
+
+model EmbedPreset {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  guildId      String
+  name         String
+  title        String
+  description  String
+  color        String   @default("#5865F2")
+  thumbnailUrl String?
+  imageUrl     String?
+  channelId    String?
+  messageId    String?
+  ownerId      String
+  shared       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([guildId, name])
+  @@index([guildId, shared])
+}
+
 model Warning {
   id          String      @id @default(auto()) @map("_id") @db.ObjectId
   guildId     String

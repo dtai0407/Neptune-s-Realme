@@ -1,5 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Events, Message } from "discord.js";
 import { ExtendedClient } from "../../@type";
+import { db } from "../../database/client";
 import { activeGiveaways, finishGiveaway, GiveawayState } from "../../services/giveaway.service";
 
 async function safeSendMessage(message: Message, payload: any) {
@@ -129,6 +130,23 @@ export default {
 
     const prefix = client.prefix ?? "n";
     const content = message.content.trim();
+
+    if (message.guild && !content.toLowerCase().startsWith(prefix.toLowerCase())) {
+      const trigger = content.toLowerCase();
+      if (trigger) {
+        const responders = await db.autoResponder.findMany({ where: { guildId: message.guild.id } }).catch(() => []);
+        const responder = responders.find((item) =>
+          item.matchMode === "includes" ? trigger.includes(item.trigger) :
+            item.matchMode === "startswith" ? trigger.startsWith(item.trigger) :
+              item.matchMode === "endswith" ? trigger.endsWith(item.trigger) : trigger === item.trigger
+        );
+        if (responder) {
+          await safeSendMessage(message, responder.response);
+          return;
+        }
+      }
+    }
+
     if (!content.toLowerCase().startsWith(prefix.toLowerCase())) return;
 
     const args = content.slice(prefix.length).trim().split(/\s+/);
@@ -152,7 +170,7 @@ export default {
       timeout: "timeout",
       t: "timeout",
       warn: "warn",
-      w: "warn"
+      w: "warn",
     };
 
     const commandName = aliasMap[rawCommandName] ?? rawCommandName;
@@ -187,7 +205,7 @@ export default {
 
         const configurationCommands = [
           commandLine("autorole", "autorole <set/disable> ..."),
-          commandLine("setlog", "setlog <channel/disable> ...")
+          commandLine("setlog", "setlog <channel/disable> ..."),
         ].filter(Boolean).join("\n");
 
         const helpEmbed = new EmbedBuilder()

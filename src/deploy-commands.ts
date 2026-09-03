@@ -10,6 +10,8 @@ import purgeCommand from "./commands/moderation/purge";
 import warnCommand from "./commands/moderation/warn";
 import autoroleCommand from "./commands/admin/autorole";
 import setlogCommand from "./commands/config/setlog";
+import autoresponderCommand from "./commands/config/autoresponder";
+import embedCommand from "./commands/config/embed";
 
 const commandsList = [
   timeoutCommand,
@@ -18,7 +20,9 @@ const commandsList = [
   purgeCommand,
   warnCommand,
   autoroleCommand,
-  setlogCommand
+  setlogCommand,
+  autoresponderCommand,
+  embedCommand
 ];
 
 const commands = commandsList
@@ -31,8 +35,17 @@ async function deploy() {
   try {
     logger.info(`Đang đồng bộ ${commands.length} slash commands lên Discord API...`);
 
+    const route = Config.GUILD_ID
+      ? Routes.applicationGuildCommands(Config.CLIENT_ID, Config.GUILD_ID)
+      : Routes.applicationCommands(Config.CLIENT_ID);
+
+    if (Config.GUILD_ID) {
+      await rest.put(Routes.applicationCommands(Config.CLIENT_ID), { body: [] });
+      logger.info("Đã xóa các slash command global cũ để tránh bị trùng.");
+    }
+
     await rest.put(
-      Routes.applicationCommands(Config.CLIENT_ID),
+      route,
       { body: commands }
     );
 
