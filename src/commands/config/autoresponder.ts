@@ -5,13 +5,14 @@ import {
   ChatInputCommandInteraction,
   EmbedBuilder,
   PermissionFlagsBits,
+  PermissionsBitField,
   SlashCommandBuilder
 } from "discord.js";
 import { Command, ExtendedClient } from "../../@type";
 import { db } from "../../database/client";
 import { logger } from "../../utils/logger.util";
 
-function buildResponderMessage(responder: { id: string; trigger: string; response: string; matchMode: string }) {
+function buildResponderMessage(responder: { id: string; trigger: string; response: string; matchMode: string; embedName?: string | null }) {
   const detail = new EmbedBuilder()
     .setColor(0x5865f2)
     .setAuthor({ name: "Neptune's Realme" })
@@ -26,7 +27,7 @@ function buildResponderMessage(responder: { id: string; trigger: string; respons
       { name: "trigger", value: responder.trigger, inline: true },
       { name: "match mode", value: responder.matchMode, inline: true },
       { name: "response method", value: "sends in current channel", inline: true },
-      { name: "has embed(s)", value: "none", inline: true },
+      { name: "has embed(s)", value: responder.embedName ?? "none", inline: true },
       { name: "has buttons?", value: "none", inline: true },
       { name: "cooldown?", value: "no cooldown", inline: true },
       { name: "makes choices?", value: "no", inline: true },
@@ -61,11 +62,12 @@ const command: Command = {
   data: new SlashCommandBuilder()
     .setName("autoresponder")
     .setDescription("Tạo và quản lý autoresponder")
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .setDMPermission(false)
     .addSubcommand((subcommand) => subcommand.setName("add").setDescription("Tạo hoặc cập nhật một autoresponder")
       .addStringOption((option) => option.setName("trigger").setDescription("Từ khóa kích hoạt mới").setMaxLength(100).setRequired(true))
       .addStringOption((option) => option.setName("reply").setDescription("Nội dung bot trả lời").setMaxLength(2000).setRequired(true))
+      .addStringOption((option) => option.setName("embed").setDescription("Tên embed đã lưu để gửi kèm").setMaxLength(100).setAutocomplete(true))
       .addStringOption((option) => option.setName("matchmode").setDescription("Cách khớp trigger").addChoices(
         { name: "exact", value: "exact" },
         { name: "startswith", value: "startswith" },
@@ -96,6 +98,14 @@ const command: Command = {
 
   execute: async (interaction: ChatInputCommandInteraction, _client: ExtendedClient) => {
     const guildId = interaction.guildId!;
+    const isOwner = interaction.guild?.ownerId === interaction.user.id;
+    const isAdmin = interaction.member && "permissions" in interaction.member
+      ? new PermissionsBitField(interaction.member.permissions as any).has(PermissionFlagsBits.Administrator)
+      : false;
+    if (!isOwner && !isAdmin) {
+      await interaction.reply({ content: "Chỉ admin hoặc owner của server mới dùng được lệnh này.", flags: 64 });
+      return;
+    }
     const subcommand = interaction.options.getSubcommand();
     const trigger = interaction.options.getString("trigger")?.trim().toLowerCase();
 
@@ -103,10 +113,15 @@ const command: Command = {
       if (subcommand === "add") {
         const response = interaction.options.getString("reply", true).trim();
         const matchMode = interaction.options.getString("matchmode") ?? "exact";
+        const embedName = interaction.options.getString("embed")?.trim().toLowerCase() || null;
+        if (embedName) {
+          const embed = await db.embedPreset.findUnique({ where: { guildId_name: { guildId, name: embedName } } });
+          if (!embed) throw new Error("Không tìm thấy embed được chọn");
+        }
         const responder = await db.autoResponder.upsert({
           where: { guildId_trigger: { guildId, trigger: trigger! } },
-          update: { response, matchMode },
-          create: { guildId, trigger: trigger!, response, matchMode }
+          update: { response, matchMode, embedName },
+          create: { guildId, trigger: trigger!, response, matchMode, embedName }
         });
         await interaction.reply(buildResponderMessage(responder));
         return;

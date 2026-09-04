@@ -26,6 +26,7 @@ model AutoResponder {
   guildId   String
   trigger   String
   response  String
+  embedName String?
   matchMode String   @default("exact")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -43,6 +44,7 @@ model EmbedPreset {
   color        String   @default("#5865F2")
   thumbnailUrl String?
   imageUrl     String?
+  imageUrls    String   @default("[]")
   channelId    String?
   messageId    String?
   ownerId      String

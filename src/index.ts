@@ -29,7 +29,7 @@ const intents = [
 const client = new ExtendedClient({
   intents,
   partials: [Partials.Message, Partials.Channel, Partials.GuildMember, Partials.Reaction],
-  prefix: "n"
+  prefix: "np"
 });
 
 // Toàn cục chặn crash tiến trình (Process Unhandled Exception Guards)

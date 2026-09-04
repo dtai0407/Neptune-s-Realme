@@ -68,7 +68,7 @@ const command: Command = {
         const reason = interaction.options.getString("reason", true);
 
         if (!targetUser) {
-          await interaction.editReply({ content: "Vui lòng chỉ định thành viên cần cảnh cáo. Ví dụ: `nwarn add @thanhvien spam`." });
+          await interaction.editReply({ content: "Vui lòng chỉ định thành viên cần cảnh cáo. Ví dụ: `npwarn add @thanhvien spam`." });
           return;
         }
 
@@ -128,7 +128,7 @@ const command: Command = {
         const targetUser = interaction.options.getUser("target", true);
 
         if (!targetUser) {
-          await interaction.editReply({ content: "Vui lòng chỉ định thành viên cần tra cứu. Ví dụ: `nwarn list @thanhvien`." });
+          await interaction.editReply({ content: "Vui lòng chỉ định thành viên cần tra cứu. Ví dụ: `npwarn list @thanhvien`." });
           return;
         }
 

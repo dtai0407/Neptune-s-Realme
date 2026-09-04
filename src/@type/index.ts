@@ -9,7 +9,7 @@ export class ExtendedClient extends Client {
   constructor(options?: ClientOptions & { prefix?: string }) {
     super(options as ClientOptions);
     this.commands = new Collection();
-    this.prefix = options?.prefix ?? "n";
+    this.prefix = options?.prefix ?? "np";
   }
 }
 

@@ -50,7 +50,7 @@ const command: Command = {
       const reason = interaction.options.getString("reason") || "Không cung cấp lý do cụ thể";
 
       if (!targetUser) {
-        await interaction.editReply({ content: "Vui lòng chỉ định thành viên cần timeout. Ví dụ: `ntimeout @thanhvien 5 lý do`." });
+        await interaction.editReply({ content: "Vui lòng chỉ định thành viên cần timeout. Ví dụ: `nptimeout @thanhvien 5 lý do`." });
         return;
       }
 

@@ -2,6 +2,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Events, Mes
 import { ExtendedClient } from "../../@type";
 import { db } from "../../database/client";
 import { activeGiveaways, finishGiveaway, GiveawayState } from "../../services/giveaway.service";
+import { buildImageControls, getImageUrls, makeEmbed } from "../../commands/config/embed";
 
 async function safeSendMessage(message: Message, payload: any) {
   if (!("send" in message.channel)) {
@@ -43,6 +44,10 @@ function parseTimeoutDuration(input: string | undefined) {
 
   const minutes = Number(input);
   return Number.isFinite(minutes) ? minutes * 60 : 300;
+}
+
+function canUseAdminCommand(message: Message) {
+  return message.guild?.ownerId === message.author.id || message.member?.permissions.has("Administrator");
 }
 
 function buildMessageInteraction(message: Message, client: ExtendedClient, commandName: string, args: string[]) {
@@ -128,7 +133,7 @@ export default {
   async execute(message: Message, client: ExtendedClient) {
     if (message.author.bot) return;
 
-    const prefix = client.prefix ?? "n";
+    const prefix = client.prefix ?? "np";
     const content = message.content.trim();
 
     if (message.guild && !content.toLowerCase().startsWith(prefix.toLowerCase())) {
@@ -141,7 +146,20 @@ export default {
               item.matchMode === "endswith" ? trigger.endsWith(item.trigger) : trigger === item.trigger
         );
         if (responder) {
-          await safeSendMessage(message, responder.response);
+          const embedName = (responder as { embedName?: string | null }).embedName;
+          const embed = embedName
+            ? await db.embedPreset.findUnique({ where: { guildId_name: { guildId: message.guild.id, name: embedName } } }).catch(() => null)
+            : null;
+          if (embed) {
+            const imageUrls = getImageUrls(embed);
+            await safeSendMessage(message, {
+              content: responder.response || undefined,
+              embeds: [makeEmbed(embed.title, embed.description, embed.color, embed.thumbnailUrl, imageUrls[0] ?? null)],
+              components: buildImageControls(embed.id, imageUrls)
+            });
+          } else {
+            await safeSendMessage(message, responder.response);
+          }
           return;
         }
       }
@@ -195,12 +213,12 @@ export default {
         };
 
         const moderationCommands = [
-          commandLine("ban", "ban <@user> [lý do]", "nb"),
-          commandLine("kick", "kick <@user> [lý do]", "nk"),
-          commandLine("purge", "purge <số lượng> [@user]", "np"),
-          commandLine("timeout", "timeout <@user> <thời lượng> [lý do]", "nt"),
-          commandLine("warn", "warn <add/list/remove> ...", "nw"),
-          commandLine("giveaway", "giveaway <thời gian> <số người thắng> <phần thưởng>", "ga")
+          commandLine("ban", "ban <@user> [lý do]", "npb"),
+          commandLine("kick", "kick <@user> [lý do]", "npk"),
+          commandLine("purge", "purge <số lượng> [@user]", "npp"),
+          commandLine("timeout", "timeout <@user> <thời lượng> [lý do]", "npt"),
+          commandLine("warn", "warn <add/list/remove> ...", "npw"),
+          commandLine("giveaway", "giveaway <thời gian> <số người thắng> <phần thưởng>", "npg")
         ].filter(Boolean).join("\n");
 
         const configurationCommands = [
@@ -253,6 +271,10 @@ export default {
         await safeSendMessage(msg, `Pong! Latency: ${Date.now() - msg.createdTimestamp}ms`);
       },
       status: async (msg, _args, bot) => {
+        if (!canUseAdminCommand(msg)) {
+          await safeSendMessage(msg, "Chỉ admin hoặc owner của server mới dùng được lệnh này.");
+          return;
+        }
         const commandsCount = bot.commands.size;
         await safeSendMessage(msg, `Bot đang online. Prefix: \`${bot.prefix}\`. Tổng lệnh hiện có: **${commandsCount}**.`);
       },
@@ -260,7 +282,7 @@ export default {
         const targetUser = args[0] ? resolveMentionOrId(args[0], msg) : msg.author;
 
         if (!targetUser) {
-          await safeSendMessage(msg, "Không tìm thấy người dùng. Hãy dùng `nav @user` hoặc `nav <user_id>`." );
+          await safeSendMessage(msg, "Không tìm thấy người dùng. Hãy dùng `npav @user` hoặc `npav <user_id>`." );
           return;
         }
 
@@ -293,6 +315,10 @@ export default {
       giveaway: async (msg, args) => {
         if (!msg.guild) {
           await safeSendMessage(msg, "Lệnh giveaway chỉ dùng được trong server.");
+          return;
+        }
+        if (!canUseAdminCommand(msg)) {
+          await safeSendMessage(msg, "Chỉ admin hoặc owner của server mới dùng được lệnh này.");
           return;
         }
 
