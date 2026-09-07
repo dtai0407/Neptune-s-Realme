@@ -50,6 +50,34 @@ function canUseAdminCommand(message: Message) {
   return message.guild?.ownerId === message.author.id || message.member?.permissions.has("Administrator");
 }
 
+const interactionGifs: Record<"hug" | "pat" | "slap" | "kiss", string[]> = {
+  hug: [
+    "https://res.cloudinary.com/dgwy52a5x/image/upload/v1788761748/51718513773fe938a87375d53b211b36_ki0wtq.gif",
+    "https://res.cloudinary.com/dgwy52a5x/image/upload/v1788762066/f4e65f103fe0addd71506c821a9003e4_jozshs.gif"
+  ],
+  pat: [
+    ""
+  ],
+  slap: [
+    ""
+  ],
+  kiss: [
+    "https://res.cloudinary.com/dgwy52a5x/image/upload/v1788762102/69047c455a0f85a7eba0033a46fcf283_r9ww4q.gif"
+  ]
+};
+
+async function sendInteraction(message: Message, action: "hug" | "pat" | "slap" | "kiss", description: string, color: number) {
+  const gifs = interactionGifs[action];
+  const gifUrl = gifs[Math.floor(Math.random() * gifs.length)];
+  const embed = new EmbedBuilder()
+    .setColor(color)
+    .setDescription(description)
+    .setImage(gifUrl)
+    .setTimestamp();
+
+  await safeSendMessage(message, { embeds: [embed] });
+}
+
 function buildMessageInteraction(message: Message, client: ExtendedClient, commandName: string, args: string[]) {
   const guild = message.guild;
   const member = message.member;
@@ -189,6 +217,10 @@ export default {
       t: "timeout",
       warn: "warn",
       w: "warn",
+      hug: "hug",
+      pat: "pat",
+      slap: "slap",
+      kiss: "kiss",
     };
 
     const commandName = aliasMap[rawCommandName] ?? rawCommandName;
@@ -203,7 +235,11 @@ export default {
           warn: "Quản lý cảnh cáo thành viên",
           autorole: "Tự động cấp role cho thành viên mới",
           setlog: "Thiết lập kênh nhật ký máy chủ",
-          giveaway: "Tạo giveaway và chọn người thắng tự động"
+          giveaway: "Tạo giveaway và chọn người thắng tự động",
+          hug: "Ôm một thành viên",
+          pat: "Xoa đầu một thành viên",
+          slap: "Tát nhẹ một thành viên",
+          kiss: "Gửi một nụ hôn thân thiện"
         };
 
         const availableCommands = new Set(bot.commands.keys());
@@ -219,6 +255,13 @@ export default {
           commandLine("timeout", "timeout <@user> <thời lượng> [lý do]", "npt"),
           commandLine("warn", "warn <add/list/remove> ...", "npw"),
           commandLine("giveaway", "giveaway <thời gian> <số người thắng> <phần thưởng>", "npg")
+        ].filter(Boolean).join("\n");
+
+        const funCommands = [
+          commandLine("hug", "hug <@user>"),
+          commandLine("pat", "pat <@user>"),
+          commandLine("slap", "slap <@user>"),
+          commandLine("kiss", "kiss <@user>")
         ].filter(Boolean).join("\n");
 
         const configurationCommands = [
@@ -251,6 +294,10 @@ export default {
             {
               name: "Cấu hình máy chủ",
               value: configurationCommands || "Chưa có lệnh khả dụng"
+            },
+            {
+              name: "Tương tác",
+              value: funCommands || "Chưa có lệnh khả dụng"
             },
             {
               name: "Cú pháp nhanh",
@@ -375,6 +422,38 @@ export default {
         setTimeout(() => {
           finishGiveaway(client, giveaway).catch((error) => console.error("Lỗi kết thúc giveaway:", error));
         }, durationSeconds * 1000);
+      },
+      hug: async (msg, args) => {
+        const target = resolveMentionOrId(args[0], msg);
+        if (!target) {
+          await safeSendMessage(msg, `Vui lòng tag thành viên. Ví dụ: \`${client.prefix}hug @user\`.`);
+          return;
+        }
+        await sendInteraction(msg, "hug", `🤗 <@${msg.author.id}> đã ôm <@${target.id}>!`, 0x001857);
+      },
+      pat: async (msg, args) => {
+        const target = resolveMentionOrId(args[0], msg);
+        if (!target) {
+          await safeSendMessage(msg, `Vui lòng tag thành viên. Ví dụ: \`${client.prefix}pat @user\`.`);
+          return;
+        }
+        await sendInteraction(msg, "pat", `😊 <@${msg.author.id}> đã xoa đầu <@${target.id}>!`, 0x001857);
+      },
+      slap: async (msg, args) => {
+        const target = resolveMentionOrId(args[0], msg);
+        if (!target) {
+          await safeSendMessage(msg, `Vui lòng tag thành viên. Ví dụ: \`${client.prefix}slap @user\`.`);
+          return;
+        }
+        await sendInteraction(msg, "slap", `🖐️ <@${msg.author.id}> đã tát nhẹ <@${target.id}>!`, 0x001857);
+      },
+      kiss: async (msg, args) => {
+        const target = resolveMentionOrId(args[0], msg);
+        if (!target) {
+          await safeSendMessage(msg, `Vui lòng tag thành viên. Ví dụ: \`${client.prefix}kiss @user\`.`);
+          return;
+        }
+        await sendInteraction(msg, "kiss", `😘 <@${msg.author.id}> đã gửi một nụ hôn thân thiện đến <@${target.id}>!`, 0x001857);
       }
     };
 
