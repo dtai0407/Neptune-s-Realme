@@ -1,7 +1,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Events, Message } from "discord.js";
 import { ExtendedClient } from "../../@type";
 import { db } from "../../database/client";
-import { activeGiveaways, finishGiveaway, GiveawayState } from "../../services/giveaway.service";
+import { activeGiveaways, completedGiveaways, finishGiveaway, GiveawayState, rerollGiveaway } from "../../services/giveaway.service";
 import { buildImageControls, getImageUrls, makeEmbed } from "../../commands/config/embed";
 
 async function safeSendMessage(message: Message, payload: any) {
@@ -235,7 +235,7 @@ export default {
           warn: "Quản lý cảnh cáo thành viên",
           autorole: "Tự động cấp role cho thành viên mới",
           setlog: "Thiết lập kênh nhật ký máy chủ",
-          giveaway: "Tạo giveaway và chọn người thắng tự động",
+          giveaway: "Tạo giveaway, chọn người thắng tự động hoặc reroll lại kết quả",
           hug: "Ôm một thành viên",
           pat: "Xoa đầu một thành viên",
           slap: "Tát nhẹ một thành viên",
@@ -254,7 +254,7 @@ export default {
           commandLine("purge", "purge <số lượng> [@user]", "npp"),
           commandLine("timeout", "timeout <@user> <thời lượng> [lý do]", "npt"),
           commandLine("warn", "warn <add/list/remove> ...", "npw"),
-          commandLine("giveaway", "giveaway <thời gian> <số người thắng> <phần thưởng>", "npg")
+          commandLine("giveaway", "giveaway <thời gian> <số người thắng> <phần thưởng> | giveaway reroll <messageId> [số người thắng]", "npg")
         ].filter(Boolean).join("\n");
 
         const funCommands = [
@@ -366,6 +366,35 @@ export default {
         }
         if (!canUseAdminCommand(msg)) {
           await safeSendMessage(msg, "Chỉ admin hoặc owner của server mới dùng được lệnh này.");
+          return;
+        }
+
+        const firstArg = args[0]?.toLowerCase();
+        if (firstArg === "reroll") {
+          const messageId = args[1]?.trim();
+          const customWinnerCount = Number(args[2] ?? 0);
+
+          if (!messageId) {
+            await safeSendMessage(msg, `Sai cú pháp. Ví dụ: \`${client.prefix}ga reroll <messageId> [số người thắng]\`.`);
+            return;
+          }
+
+          const historicalGiveaway = completedGiveaways.get(messageId)
+            ?? activeGiveaways.get(messageId);
+
+          if (!historicalGiveaway) {
+            await safeSendMessage(msg, "Không tìm thấy giveaway tương ứng với messageId đó. Hãy đảm bảo đây là message giveaway đã kết thúc hoặc đang active.");
+            return;
+          }
+
+          if (!Number.isInteger(customWinnerCount) || customWinnerCount < 1 || customWinnerCount > 20) {
+            const result = await rerollGiveaway(client, historicalGiveaway, historicalGiveaway.winnerCount);
+            await safeSendMessage(msg, result ? `Đã reroll giveaway **${historicalGiveaway.prize}** bằng số người thắng mặc định (${historicalGiveaway.winnerCount}).` : "Không thể reroll giveaway lúc này.");
+            return;
+          }
+
+          const result = await rerollGiveaway(client, historicalGiveaway, customWinnerCount);
+          await safeSendMessage(msg, result ? `Đã reroll giveaway **${historicalGiveaway.prize}** với ${customWinnerCount} người thắng mới.` : "Không thể reroll giveaway lúc này.");
           return;
         }
 
