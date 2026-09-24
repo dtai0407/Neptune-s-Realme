@@ -3,6 +3,7 @@ import { ExtendedClient } from "../../@type";
 import { db } from "../../database/client";
 import { activeGiveaways, completedGiveaways, finishGiveaway, GiveawayState, rerollGiveaway } from "../../services/giveaway.service";
 import { buildImageControls, getImageUrls, makeEmbed } from "../../commands/config/embed";
+import { parseAutoresponderEmbedNames } from "../../utils/autoresponder.util";
 
 async function safeSendMessage(message: Message, payload: any) {
   if (!("send" in message.channel)) {
@@ -174,16 +175,22 @@ export default {
               item.matchMode === "endswith" ? trigger.endsWith(item.trigger) : trigger === item.trigger
         );
         if (responder) {
-          const embedName = (responder as { embedName?: string | null }).embedName;
-          const embed = embedName
-            ? await db.embedPreset.findUnique({ where: { guildId_name: { guildId: message.guild.id, name: embedName } } }).catch(() => null)
-            : null;
-          if (embed) {
-            const imageUrls = getImageUrls(embed);
+          const embedNames = parseAutoresponderEmbedNames((responder as { embedName?: string | null }).embedName);
+          const embeds = embedNames.length
+            ? await db.embedPreset.findMany({ where: { guildId: message.guild.id, name: { in: embedNames } } }).catch(() => [])
+            : [];
+          const orderedEmbeds = embedNames
+            .map((name) => embeds.find((embed) => embed.name === name))
+            .filter((embed): embed is (typeof embeds)[number] => Boolean(embed));
+          if (orderedEmbeds.length) {
+            const firstEmbed = orderedEmbeds[0];
             await safeSendMessage(message, {
               content: responder.response || undefined,
-              embeds: [makeEmbed(embed.title, embed.description, embed.color, embed.thumbnailUrl, imageUrls[0] ?? null)],
-              components: buildImageControls(embed.id, imageUrls)
+              embeds: orderedEmbeds.slice(0, 10).map((embed) => {
+                const imageUrls = getImageUrls(embed);
+                return makeEmbed(embed.title, embed.description, embed.color, embed.thumbnailUrl, imageUrls[0] ?? null);
+              }),
+              components: orderedEmbeds.length === 1 ? buildImageControls(firstEmbed.id, getImageUrls(firstEmbed)) : []
             });
           } else {
             await safeSendMessage(message, responder.response);

@@ -11,8 +11,10 @@ import {
 import { Command, ExtendedClient } from "../../@type";
 import { db } from "../../database/client";
 import { logger } from "../../utils/logger.util";
+import { parseAutoresponderEmbedNames } from "../../utils/autoresponder.util";
 
 function buildResponderMessage(responder: { id: string; trigger: string; response: string; matchMode: string; embedName?: string | null }) {
+  const embedNames = parseAutoresponderEmbedNames(responder.embedName);
   const detail = new EmbedBuilder()
     .setColor(0x5865f2)
     .setAuthor({ name: "Neptune's Realme" })
@@ -27,7 +29,7 @@ function buildResponderMessage(responder: { id: string; trigger: string; respons
       { name: "trigger", value: responder.trigger, inline: true },
       { name: "match mode", value: responder.matchMode, inline: true },
       { name: "response method", value: "sends in current channel", inline: true },
-      { name: "has embed(s)", value: responder.embedName ?? "none", inline: true },
+      { name: "has embed(s)", value: embedNames.join(", ") || "none", inline: true },
       { name: "has buttons?", value: "none", inline: true },
       { name: "cooldown?", value: "no cooldown", inline: true },
       { name: "makes choices?", value: "no", inline: true },
@@ -67,7 +69,7 @@ const command: Command = {
     .addSubcommand((subcommand) => subcommand.setName("add").setDescription("Tạo hoặc cập nhật một autoresponder")
       .addStringOption((option) => option.setName("trigger").setDescription("Từ khóa kích hoạt mới").setMaxLength(100).setRequired(true))
       .addStringOption((option) => option.setName("reply").setDescription("Nội dung bot trả lời").setMaxLength(2000).setRequired(true))
-      .addStringOption((option) => option.setName("embed").setDescription("Tên embed đã lưu để gửi kèm").setMaxLength(100).setAutocomplete(true))
+      .addStringOption((option) => option.setName("embed").setDescription("Tên embed đã lưu, phân cách bằng dấu phẩy").setMaxLength(1000).setAutocomplete(true))
       .addStringOption((option) => option.setName("matchmode").setDescription("Cách khớp trigger").addChoices(
         { name: "exact", value: "exact" },
         { name: "startswith", value: "startswith" },
@@ -113,11 +115,16 @@ const command: Command = {
       if (subcommand === "add") {
         const response = interaction.options.getString("reply", true).trim();
         const matchMode = interaction.options.getString("matchmode") ?? "exact";
-        const embedName = interaction.options.getString("embed")?.trim().toLowerCase() || null;
-        if (embedName) {
-          const embed = await db.embedPreset.findUnique({ where: { guildId_name: { guildId, name: embedName } } });
-          if (!embed) throw new Error("Không tìm thấy embed được chọn");
+        const embedNames = [...new Set((interaction.options.getString("embed") ?? "")
+          .split(/[\n,]/)
+          .map((name) => name.trim().toLowerCase())
+          .filter(Boolean))];
+        if (embedNames.length) {
+          const embeds = await db.embedPreset.findMany({ where: { guildId, name: { in: embedNames } } });
+          const missingEmbed = embedNames.find((name) => !embeds.some((embed) => embed.name === name));
+          if (missingEmbed) throw new Error(`Không tìm thấy embed ${missingEmbed}`);
         }
+        const embedName = embedNames.length ? JSON.stringify(embedNames) : null;
         const responder = await db.autoResponder.upsert({
           where: { guildId_trigger: { guildId, trigger: trigger! } },
           update: { response, matchMode, embedName },
